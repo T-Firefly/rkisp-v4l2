@@ -14,6 +14,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 set(LOCAL_INC_PATH ${CMAKE_CURRENT_SOURCE_DIR}/rkisp_inc)
 set(LOCAL_LIB_PATH ${CMAKE_CURRENT_SOURCE_DIR}/rkisp_lib)
 
+include_directories(/usr/include/drm )
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include/firefly )
 include_directories(${LOCAL_INC_PATH} )
 include_directories(${LOCAL_INC_PATH}/interface )
