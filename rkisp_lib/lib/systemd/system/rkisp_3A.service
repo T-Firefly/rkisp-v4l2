@@ -1,0 +1,12 @@
+[Unit]
+Description=rkisp 3A engine
+Before=rockchip.service
+
+[Service]
+Type=forking
+ExecStart=/etc/init.d/rkisp_3A.sh start
+ExecStop=/etc/init.d/rkisp_3A.sh stop
+
+[Install]
+Alias=rkisp_3A.service
+WantedBy=multi-user.target
