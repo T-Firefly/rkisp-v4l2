@@ -3,6 +3,7 @@
  * AUTHOT : Jacob Chen
  * DATA : 2018-02-25
  */
+#define DEBUG
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -29,9 +30,7 @@
 #include <opencv2/imgproc/imgproc.hpp>
 
 #ifdef USE_RGA
-extern "C" {
-#include <ff_rga.h>
-}
+#include "rga_ops.h"
 #endif
 
 extern "C" {
@@ -123,6 +122,9 @@ static unsigned int drm_handle;
 
 #ifdef USE_RGA
 RockchipRga *rga;
+bo_t bo_dst;
+rga_info_t rga_info_src;
+rga_info_t rga_info_dst;
 #endif
 
 struct display_buffer disp_buf;
@@ -645,8 +647,8 @@ static void process_buffer(struct buffer* buff, int size)
 	}
 
 #ifdef USE_RGA
-	rga->ops->setSrcBufferPtr(rga, buff->start);
-	rga->ops->go(rga);
+	rga_info_src.virAddr = buff->start;
+	rga->RkRgaBlit(&rga_info_src, &rga_info_dst, NULL);
 
 	cv::imshow("video", *mat);
 #else
@@ -675,7 +677,7 @@ static int read_frame()
             buf.length = FMT_NUM_PLANES;
         }
 
-        if (-1 == xioctl(fd, VIDIOC_DQBUF, &buf)) 
+        if (-1 == xioctl(fd, VIDIOC_DQBUF, &buf))
                 errno_exit("VIDIOC_DQBUF");
 
         i = buf.index;
@@ -688,7 +690,7 @@ static int read_frame()
         DBG("bytesused %d\n", bytesused);
 
         if (-1 == xioctl(fd, VIDIOC_QBUF, &buf))
-            errno_exit("VIDIOC_QBUF"); 
+            errno_exit("VIDIOC_QBUF");
 
         return 1;
 }
@@ -726,7 +728,7 @@ static void mainloop(void)
             rkisp_get_meta_frame_sof_ts((void*&)g_3A_control_params, frame_sof);
             read_frame();
 			read_end_time = get_time();
-			DBG("take time %d ms\n",read_end_time - read_start_time);
+			DBG("take time %lu ms\n",read_end_time - read_start_time);
         }
         DBG("\nREAD AND SAVE DONE!\n");
 }
@@ -992,6 +994,7 @@ static void init_display_buf(int buffer_size, int width, int height)
 		//drm_fd = init_drm();
 
     //disp_buf.start = get_drm_fd(drm_fd, width, height, 24, &export_dmafd);
+	bpp = buffer_size * 8 / width / height;
 	disp_buf.length= buffer_size;
 	disp_buf.width = width;
 	disp_buf.height= height;
@@ -1001,8 +1004,21 @@ static void init_display_buf(int buffer_size, int width, int height)
 	//mat = new cv::Mat(cv::Size(width, height), CV_8UC3, disp_buf.start);
 #ifdef USE_RGA
 	//alloc a buffer for rga input
-	mat = new cv::Mat(cv::Size(width, height), CV_8UC3);
-	disp_buf.start = mat->data;
+//dst
+	rga->RkRgaGetAllocBuffer(&bo_dst, disp_buf.width, disp_buf.height, 32);
+	rga->RkRgaGetBufferFd(&bo_dst, &(rga_info_dst.fd));
+
+	set_rect_size(&(rga_info_dst.rect), disp_buf.width, disp_buf.height);
+	set_rect_crop(&(rga_info_dst.rect), 0, 0, disp_buf.width, disp_buf.height);
+	set_rect_format(&(rga_info_dst.rect), V4l2ToRgaFormat(V4L2_PIX_FMT_RGB24, YUV_TO_RGB));
+
+	rga->RkRgaGetMmap(&bo_dst);
+	mat = new cv::Mat(cv::Size(width, height), CV_8UC3, bo_dst.ptr);
+
+//src
+	set_rect_size(&(rga_info_src.rect), width, height);
+	set_rect_crop(&(rga_info_src.rect), 0, 0, width, height);
+	set_rect_format(&(rga_info_src.rect), V4l2ToRgaFormat(format, YUV_TO_RGB));
 #endif
 	cv::namedWindow("video");
 }
@@ -1010,16 +1026,16 @@ static void init_display_buf(int buffer_size, int width, int height)
 #ifdef USE_RGA
 static void init_rga(struct display_buffer* disp_buf)
 {
-	rga = RgaCreate();
-	rga->ops->initCtx(rga);
+	rga = new RockchipRga();
+	rga->RkRgaInit();
 
-	rga->ops->setSrcFormat(rga, format, width, height);
-	rga->ops->setSrcCrop(rga, 0, 0, width, height);
+	memset(&rga_info_src, 0, sizeof(rga_info_t));
+	rga_info_src.mmuFlag = 1;
+	rga_info_src.fd = -1;
 
-	//rga->ops->setDstBufferFd(rga, disp_buf->buf_fd);
-	rga->ops->setDstBufferPtr(rga, disp_buf->start);
-	rga->ops->setDstFormat(rga, V4L2_PIX_FMT_RGB24, width, height);
-	rga->ops->setDstCrop(rga, 0, 0, width, height);
+	memset(&rga_info_dst, 0, sizeof(rga_info_t));
+	rga_info_dst.mmuFlag = 1;
+	rga_info_dst.fd = -1;
 }
 #endif
 
@@ -1068,10 +1084,10 @@ static void init_device(void)
 
 		init_mmap();
 
-        init_display_buf(fmt.fmt.pix.sizeimage, width, height);
 #ifdef USE_RGA
 		init_rga(&disp_buf);
 #endif
+        init_display_buf(fmt.fmt.pix.sizeimage, width, height);
 
 		//INIT RKISP
         _RKIspFunc.rkisp_handle = dlopen(LIBRKISP, RTLD_NOW);
