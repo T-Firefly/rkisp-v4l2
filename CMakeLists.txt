@@ -39,7 +39,7 @@ link_directories(${LOCAL_LIB_PATH}/usr/lib/rkisp/ae)
 link_directories(${LOCAL_LIB_PATH}/usr/lib/rkisp/af)
 link_directories(${LOCAL_LIB_PATH}/usr/lib/rkisp/awb)
 
-set(link_libs dl rkisp rkisp_af rkisp_aec rkisp_awb ff_rga pthread drm opencv_core opencv_highgui opencv_imgcodecs)
+set(link_libs dl rkisp rkisp_af rkisp_aec rkisp_awb ff_rga pthread drm opencv_core opencv_highgui opencv_imgcodecs opencv_imgproc)
 add_executable(rkisp_demo rkisp_demo.cpp)
 target_link_libraries(rkisp_demo ${link_libs})
 target_compile_definitions(rkisp_demo PUBLIC RKISP=1)

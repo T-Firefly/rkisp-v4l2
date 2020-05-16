@@ -26,10 +26,13 @@
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
+#include <opencv2/imgproc/imgproc.hpp>
 
+#ifdef USE_RGA
 extern "C" {
 #include <ff_rga.h>
 }
+#endif
 
 extern "C" {
 #define virtual vir
@@ -117,7 +120,11 @@ static float mae_expo = 0.0f;
 FILE *fp=NULL;
 static int silent;
 static unsigned int drm_handle;
+
+#ifdef USE_RGA
 RockchipRga *rga;
+#endif
+
 struct display_buffer disp_buf;
 cv::Mat* mat;
 
@@ -637,10 +644,18 @@ static void process_buffer(struct buffer* buff, int size)
 		fflush(fp);
 	}
 
+#ifdef USE_RGA
 	rga->ops->setSrcBufferPtr(rga, buff->start);
 	rga->ops->go(rga);
 
 	cv::imshow("video", *mat);
+#else
+	cv::Mat yuvmat(cv::Size(width, height*3/2), CV_8UC1, buff->start);
+    cv::Mat rgbmat(cv::Size(width, height), CV_8UC3);
+    cv::cvtColor(yuvmat, rgbmat, CV_YUV2BGR_NV12);
+	cv::imshow("video", rgbmat);
+#endif
+
 	cv::waitKey(1);
 }
 
@@ -678,19 +693,30 @@ static int read_frame()
         return 1;
 }
 
+static unsigned long get_time(void)
+{
+	struct timeval ts;
+	gettimeofday(&ts, NULL);
+	return (ts.tv_sec * 1000 + ts.tv_usec / 1000);
+}
+
 static void mainloop(void)
 {
         unsigned int count = frame_count;
         float exptime, expgain;
         int64_t frame_id, frame_sof;
+        pthread_t display_thread_id;
 
         if (mae_gain > 0 && mae_expo > 0)
             rkisp_setManualGainAndTime((void*&)g_3A_control_params, mae_gain, mae_expo);
         else
             rkisp_setAeMode((void*&)g_3A_control_params, HAL_AE_OPERATION_MODE_AUTO);
 
+        //pthread_create(&display_thread_id, NULL, RgaProcessThread, dec);
+        unsigned long read_start_time, read_end_time;
         while (count-- > 0) {
             DBG("No.%d\n",frame_count - count);        //显示当前帧数目
+			read_start_time = get_time();
             // examples show how to use 3A interfaces
             rkisp_getAeTime((void*&)g_3A_control_params, exptime);
             rkisp_getAeGain((void*&)g_3A_control_params, expgain);
@@ -699,6 +725,8 @@ static void mainloop(void)
             rkisp_get_meta_frame_id((void*&)g_3A_control_params, frame_id);
             rkisp_get_meta_frame_sof_ts((void*&)g_3A_control_params, frame_sof);
             read_frame();
+			read_end_time = get_time();
+			DBG("take time %d ms\n",read_end_time - read_start_time);
         }
         DBG("\nREAD AND SAVE DONE!\n");
 }
@@ -971,11 +999,15 @@ static void init_display_buf(int buffer_size, int width, int height)
 	//disp_buf.buf_fd= export_dmafd;
 
 	//mat = new cv::Mat(cv::Size(width, height), CV_8UC3, disp_buf.start);
+#ifdef USE_RGA
+	//alloc a buffer for rga input
 	mat = new cv::Mat(cv::Size(width, height), CV_8UC3);
 	disp_buf.start = mat->data;
+#endif
 	cv::namedWindow("video");
 }
 
+#ifdef USE_RGA
 static void init_rga(struct display_buffer* disp_buf)
 {
 	rga = RgaCreate();
@@ -989,6 +1021,7 @@ static void init_rga(struct display_buffer* disp_buf)
 	rga->ops->setDstFormat(rga, V4L2_PIX_FMT_RGB24, width, height);
 	rga->ops->setDstCrop(rga, 0, 0, width, height);
 }
+#endif
 
 static void init_device(void)
 {
@@ -1036,7 +1069,9 @@ static void init_device(void)
 		init_mmap();
 
         init_display_buf(fmt.fmt.pix.sizeimage, width, height);
+#ifdef USE_RGA
 		init_rga(&disp_buf);
+#endif
 
 		//INIT RKISP
         _RKIspFunc.rkisp_handle = dlopen(LIBRKISP, RTLD_NOW);
