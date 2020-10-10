@@ -101,7 +101,7 @@ struct display_buffer {
 };
 
 static char iq_file[255] = "/etc/cam_iq.xml";
-static char out_file[255] = "";
+static char out_file[255] = "/tmp/fifo";
 static char dev_name[255];
 static int width = 640;
 static int height = 480;
@@ -118,6 +118,8 @@ static float mae_expo = 0.0f;
 FILE *fp=NULL;
 static int silent;
 static unsigned int drm_handle;
+
+int dev_fd;
 
 #ifdef USE_RGA
 RockchipRga *rga;
@@ -646,6 +648,12 @@ static void process_buffer(struct buffer* buff, int size)
 		fflush(fp);
 	}
 
+    /*写到video5*/
+    if (write(dev_fd, buff->start, size) != size) {
+        errno_exit("process_buffer read error");
+    }
+
+/*
 #ifdef USE_RGA
 	rga_info_src.virAddr = buff->start;
 	rga->RkRgaBlit(&rga_info_src, &rga_info_dst, NULL);
@@ -659,6 +667,7 @@ static void process_buffer(struct buffer* buff, int size)
 #endif
 
 	cv::waitKey(1);
+*/
 }
 
 static int read_frame()
@@ -704,7 +713,7 @@ static unsigned long get_time(void)
 
 static void mainloop(void)
 {
-        unsigned int count = frame_count;
+        unsigned int count = 10000;
         float exptime, expgain;
         int64_t frame_id, frame_sof;
         pthread_t display_thread_id;
@@ -718,8 +727,12 @@ static void mainloop(void)
 
         //pthread_create(&display_thread_id, NULL, RgaProcessThread, dec);
         unsigned long read_start_time, read_end_time;
-        while (count-- > 0) {
-            DBG("No.%d\n",frame_count - count);        //显示当前帧数目
+        while (1) {
+
+            DBG("No.%d\n", count);        //显示当前帧数目
+            if(count++ == 10000)
+                count = 0;
+
 			read_start_time = get_time();
             // examples show how to use 3A interfaces
 #if 0
@@ -1231,16 +1244,48 @@ void parse_args(int argc, char **argv)
    }
 }
 
+void
+sysfail(char *msg)
+{
+	perror(msg);
+	exit(1);
+}
+
+#define vidioc(op, arg) \
+	if (ioctl(dev_fd, VIDIOC_##op, arg) == -1) \
+		sysfail(#op); \
+	else
+
+void
+init_output_video(char * name)
+{
+	struct v4l2_format v;
+
+	dev_fd = open(name, O_RDWR);
+	if (dev_fd == -1) sysfail(name);
+	v.type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
+	vidioc(G_FMT, &v);
+	v.fmt.pix.width = width;//frame_width;
+	v.fmt.pix.height = height;//frame_height;
+	v.fmt.pix.pixelformat = V4L2_PIX_FMT_YUV420;
+	v.fmt.pix.sizeimage = (width * height*3/2);//frame_bytes = 3 * frame_width * frame_height / 2;
+	vidioc(S_FMT, &v);
+    //close(dev_fd);
+}
+
 int main(int argc, char **argv)
 {
         parse_args(argc, argv);
-
+/*
 		if (strlen(out_file) != 0) {
+            init_output_video(out_file);
 			if ((fp = fopen(out_file, "w")) == NULL) {
 				perror("Creat file failed");
 				exit(0);
 			}
 		}
+*/
+        init_output_video("/dev/video10");
 
         open_device();
         init_device();
