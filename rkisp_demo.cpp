@@ -3,7 +3,6 @@
  * AUTHOT : Jacob Chen
  * DATA : 2018-02-25
  */
-#define DEBUG
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -190,6 +189,7 @@ static void construct_default_metas(CameraMetadata* metas)
 
 static void init_3A_control_params()
 {
+	return;
     camera_metadata_t* meta;
 
     meta = allocate_camera_metadata(DEFAULT_ENTRY_CAP, DEFAULT_DATA_CAP);
@@ -709,10 +709,12 @@ static void mainloop(void)
         int64_t frame_id, frame_sof;
         pthread_t display_thread_id;
 
+#if 0
         if (mae_gain > 0 && mae_expo > 0)
             rkisp_setManualGainAndTime((void*&)g_3A_control_params, mae_gain, mae_expo);
         else
             rkisp_setAeMode((void*&)g_3A_control_params, HAL_AE_OPERATION_MODE_AUTO);
+#endif
 
         //pthread_create(&display_thread_id, NULL, RgaProcessThread, dec);
         unsigned long read_start_time, read_end_time;
@@ -720,12 +722,14 @@ static void mainloop(void)
             DBG("No.%d\n",frame_count - count);        //显示当前帧数目
 			read_start_time = get_time();
             // examples show how to use 3A interfaces
+#if 0
             rkisp_getAeTime((void*&)g_3A_control_params, exptime);
             rkisp_getAeGain((void*&)g_3A_control_params, expgain);
             rkisp_getAeMaxExposureGain((void*&)g_3A_control_params, expgain);
             rkisp_getAeMaxExposureTime((void*&)g_3A_control_params, exptime);
             rkisp_get_meta_frame_id((void*&)g_3A_control_params, frame_id);
             rkisp_get_meta_frame_sof_ts((void*&)g_3A_control_params, frame_sof);
+#endif
             read_frame();
 			read_end_time = get_time();
 			DBG("take time %lu ms\n",read_end_time - read_start_time);
@@ -790,6 +794,7 @@ static void start_capturing(void)
         struct RKisp_media_ctl rkisp;
         enum v4l2_buf_type type;
 
+#if 0
     	if (_RKIspFunc.init_func != NULL) {
 			_RKIspFunc.init_func(&_rkisp_engine, iq_file,
                                (cl_result_callback_ops_t*)(g_3A_control_params));
@@ -866,6 +871,7 @@ static void start_capturing(void)
     	        DBG("rkisp_init engine succeed\n");
     	    }
     	}
+#endif
         for (i = 0; i < n_buffers; ++i) {
                 struct v4l2_buffer buf;
 
@@ -902,7 +908,7 @@ static void uninit_device(void)
 
         if (_RKIspFunc.deinit_func != NULL) {
             _RKIspFunc.deinit_func(_rkisp_engine);
-            deinit_3A_control_params();
+            //deinit_3A_control_params();
         }
 
         dlclose(_RKIspFunc.rkisp_handle);
@@ -1010,7 +1016,7 @@ static void init_display_buf(int buffer_size, int width, int height)
 
 	set_rect_size(&(rga_info_dst.rect), disp_buf.width, disp_buf.height);
 	set_rect_crop(&(rga_info_dst.rect), 0, 0, disp_buf.width, disp_buf.height);
-	set_rect_format(&(rga_info_dst.rect), V4l2ToRgaFormat(V4L2_PIX_FMT_RGB24, YUV_TO_RGB));
+	set_rect_format(&(rga_info_dst.rect), V4l2ToRgaFormat(V4L2_PIX_FMT_RGB24));
 
 	rga->RkRgaGetMmap(&bo_dst);
 	mat = new cv::Mat(cv::Size(width, height), CV_8UC3, bo_dst.ptr);
@@ -1018,7 +1024,7 @@ static void init_display_buf(int buffer_size, int width, int height)
 //src
 	set_rect_size(&(rga_info_src.rect), width, height);
 	set_rect_crop(&(rga_info_src.rect), 0, 0, width, height);
-	set_rect_format(&(rga_info_src.rect), V4l2ToRgaFormat(format, YUV_TO_RGB));
+	set_rect_format(&(rga_info_src.rect), V4l2ToRgaFormat(format));
 #endif
 	cv::namedWindow("video");
 }
@@ -1235,6 +1241,7 @@ int main(int argc, char **argv)
 				exit(0);
 			}
 		}
+
         open_device();
         init_device();
         start_capturing();

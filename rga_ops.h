@@ -31,6 +31,6 @@ enum yuv2RgbMode{
 void set_rect_format(rga_rect_t *rect, int format);
 void set_rect_size(rga_rect_t *rect, int w, int h);
 void set_rect_crop(rga_rect_t *rect, int x, int y, int w, int h);
-int V4l2ToRgaFormat(__u32 v4l2Format, __u32 yuvToRgbMode);
+int V4l2ToRgaFormat(__u32 v4l2Format);
 
 
