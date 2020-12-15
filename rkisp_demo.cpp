@@ -28,6 +28,9 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 
+
+#undef USE_RGA
+
 #ifdef USE_RGA
 #include "rga_ops.h"
 #endif
@@ -647,13 +650,13 @@ static void process_buffer(struct buffer* buff, int size)
 		fwrite(buff->start, size, 1, fp);
 		fflush(fp);
 	}
-
-    /*写到video5*/
+/*
+    //写到video10
     if (write(dev_fd, buff->start, size) != size) {
         errno_exit("process_buffer read error");
     }
+*/
 
-/*
 #ifdef USE_RGA
 	rga_info_src.virAddr = buff->start;
 	rga->RkRgaBlit(&rga_info_src, &rga_info_dst, NULL);
@@ -667,7 +670,7 @@ static void process_buffer(struct buffer* buff, int size)
 #endif
 
 	cv::waitKey(1);
-*/
+
 }
 
 static int read_frame()
@@ -1267,7 +1270,7 @@ init_output_video(char * name)
 	vidioc(G_FMT, &v);
 	v.fmt.pix.width = width;//frame_width;
 	v.fmt.pix.height = height;//frame_height;
-	v.fmt.pix.pixelformat = V4L2_PIX_FMT_YUV420;
+	v.fmt.pix.pixelformat = V4L2_PIX_FMT_NV12;
 	v.fmt.pix.sizeimage = (width * height*3/2);//frame_bytes = 3 * frame_width * frame_height / 2;
 	vidioc(S_FMT, &v);
     //close(dev_fd);
