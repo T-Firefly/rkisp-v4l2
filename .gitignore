@@ -80,3 +80,6 @@ core
 doltcompile
 doltlibtool
 xserver.ent
+CMakeCache.txt
+CMakeFiles
+cmake_install.cmake
