@@ -106,6 +106,8 @@ struct display_buffer {
 static char iq_file[255] = "/etc/cam_iq.xml";
 static char out_file[255] = "/tmp/fifo";
 static char dev_name[255];
+static int output_video_flag = 0;
+static char output_video[255];
 static int width = 640;
 static int height = 480;
 static int format = V4L2_PIX_FMT_NV12;
@@ -650,12 +652,10 @@ static void process_buffer(struct buffer* buff, int size)
 		fwrite(buff->start, size, 1, fp);
 		fflush(fp);
 	}
-/*
-    //写到video10
-    if (write(dev_fd, buff->start, size) != size) {
+
+    if (output_video_flag && write(dev_fd, buff->start, size) != size) {
         errno_exit("process_buffer read error");
     }
-*/
 
 #ifdef USE_RGA
 	rga_info_src.virAddr = buff->start;
@@ -1159,92 +1159,98 @@ static void open_device(void)
 
 void parse_args(int argc, char **argv)
 {
-   int c;
-   int digit_optind = 0;
+    int c;
+    int digit_optind = 0;
 
-   while (1) {
-       int this_option_optind = optind ? optind : 1;
-       int option_index = 0;
-       static struct option long_options[] = {
-           {"width",    required_argument, 0, 'w' },
-           {"height",   required_argument, 0, 'h' },
-           {"format",   required_argument, 0, 'f' },
-           {"iqfile",   required_argument, 0, 'i' },
-           {"device",   required_argument, 0, 'd' },
-           {"output",   required_argument, 0, 'o' },
-           {"count",    required_argument, 0, 'c' },
-           {"expo",     required_argument, 0, 'e' },
-           {"gain",     required_argument, 0, 'g' },
-           {"help",     no_argument,       0, 'p' },
-           {"silent",   no_argument,       0, 's' },
-           {0,          0,                 0,  0  }
-       };
+    while (1) {
+        int this_option_optind = optind ? optind : 1;
+        int option_index = 0;
+        static struct option long_options[] = {
+            {"width",    required_argument, 0, 'w' },
+            {"height",   required_argument, 0, 'h' },
+            {"format",   required_argument, 0, 'f' },
+            {"iqfile",   required_argument, 0, 'i' },
+            {"device",   required_argument, 0, 'd' },
+            {"output_dev",   required_argument, 0, 'D' },
+            {"output",   required_argument, 0, 'o' },
+            {"count",    required_argument, 0, 'c' },
+            {"expo",     required_argument, 0, 'e' },
+            {"gain",     required_argument, 0, 'g' },
+            {"help",     no_argument,       0, 'p' },
+            {"silent",   no_argument,       0, 's' },
+            {0,          0,                 0,  0  }
+        };
 
-       c = getopt_long(argc, argv, "w:h:m:f:i:d:o:c:e:g:ps",
-           long_options, &option_index);
-       if (c == -1)
-           break;
+        c = getopt_long(argc, argv, "w:h:m:f:i:d:D:o:c:e:g:ps",
+        long_options, &option_index);
+        if (c == -1)
+            break;
 
-       switch (c) {
-       case 'c':
-           frame_count = atoi(optarg);
-           break;
-       case 'e':
-           mae_expo = atof(optarg);
-           DBG("target expo: %f\n", mae_expo);
-           break;
-       case 'g':
-           mae_gain = atof(optarg);
-           DBG("target gain: %f\n", mae_gain);
-           break;
-       case 'w':
-           width = atoi(optarg);
-           break;
-       case 'h':
-           height = atoi(optarg);
-           break;
-       case 'f':
-           format = v4l2_fourcc(optarg[0], optarg[1], optarg[2], optarg[3]);
-           break;
-       case 'i':
-           strcpy(iq_file, optarg);
-           break;
-       case 'd':
-           strcpy(dev_name, optarg);
-           break;
-       case 'o':
-           strcpy(out_file, optarg);
-           break;
-       case 's':
-           silent = 1;
-           break;
-       case '?':
-       case 'p':
-           ERR("Usage: %s to capture rkisp1 frames\n"
-                  "         --width,  default 640,             optional, width of image\n"
-                  "         --height, default 480,             optional, height of image\n"
-                  "         --memory, default mmap,            optional, use 'mmap' or 'drm' to alloc buffers\n"
-                  "         --format, default NV12,            optional, fourcc of format\n"
-                  "         --count,  default    5,            optional, how many frames to capture\n"
-                  "         --iqfile, default /etc/cam_iq.xml, optional, camera IQ file\n"
-                  "         --device,                          required, path of video device\n"
-                  "         --output, default null             optional, output file path\n"
-                  "         --gain,   default 0,               optional\n"
-                  "         --expo,   default 0,               optional\n"
-                  "                   Manually AE is enable only if --gain and --expo are not zero\n"
-                  "         --silent,                          optional, subpress debug log\n",
-                  argv[0]);
-           exit(-1);
+        switch (c) {
+        case 'c':
+            frame_count = atoi(optarg);
+            break;
+        case 'e':
+            mae_expo = atof(optarg);
+            DBG("target expo: %f\n", mae_expo);
+            break;
+        case 'g':
+            mae_gain = atof(optarg);
+            DBG("target gain: %f\n", mae_gain);
+            break;
+        case 'w':
+            width = atoi(optarg);
+            break;
+        case 'h':
+            height = atoi(optarg);
+            break;
+        case 'f':
+            format = v4l2_fourcc(optarg[0], optarg[1], optarg[2], optarg[3]);
+            break;
+        case 'i':
+            strcpy(iq_file, optarg);
+            break;
+        case 'd':
+            strcpy(dev_name, optarg);
+            break;
+        case 'D':
+            output_video_flag = 1;
+            strcpy(output_video, optarg);
+            break;
+        case 'o':
+            strcpy(out_file, optarg);
+            break;
+        case 's':
+            silent = 1;
+            break;
+        case '?':
+        case 'p':
+            ERR("Usage: %s to capture rkisp1 frames\n"
+            "         --width,  default 640,             optional, width of image\n"
+            "         --height, default 480,             optional, height of image\n"
+            "         --memory, default mmap,            optional, use 'mmap' or 'drm' to alloc buffers\n"
+            "         --format, default NV12,            optional, fourcc of format\n"
+            "         --count,  default    5,            optional, how many frames to capture\n"
+            "         --iqfile, default /etc/cam_iq.xml, optional, camera IQ file\n"
+            "         --device,                          required, path of video device\n"
+            "         --output_dev,                      required, path of output video device\n"
+            "         --output, default null             optional, output file path\n"
+            "         --gain,   default 0,               optional\n"
+            "         --expo,   default 0,               optional\n"
+            "                   Manually AE is enable only if --gain and --expo are not zero\n"
+            "         --silent,                          optional, subpress debug log\n",
+            argv[0]);
+            exit(-1);
 
-       default:
-           ERR("?? getopt returned character code 0%o ??\n", c);
-       }
-   }
+        default:
+            ERR("?? getopt returned character code 0%o ??\n", c);
+        }
+    }
 
-   if (strlen(dev_name) == 0) {
+    if (strlen(dev_name) == 0) {
         ERR("arguments -device are required\n");
         exit(-1);
-   }
+    }
 }
 
 void
@@ -1278,26 +1284,27 @@ init_output_video(char * name)
 
 int main(int argc, char **argv)
 {
-        parse_args(argc, argv);
+    parse_args(argc, argv);
 /*
-		if (strlen(out_file) != 0) {
-            init_output_video(out_file);
-			if ((fp = fopen(out_file, "w")) == NULL) {
-				perror("Creat file failed");
-				exit(0);
-			}
-		}
+    if (strlen(out_file) != 0) {
+        init_output_video(out_file);
+        if ((fp = fopen(out_file, "w")) == NULL) {
+            perror("Creat file failed");
+            exit(0);
+        }
+    }
 */
-        init_output_video("/dev/video10");
+    if(output_video_flag)
+        init_output_video(output_video);
 
-        open_device();
-        init_device();
-        start_capturing();
-        mainloop();
-        if (fp)
-			fclose(fp);
-        stop_capturing();
-        uninit_device();
-        close_device();
-        return 0;
+    open_device();
+    init_device();
+    start_capturing();
+    mainloop();
+    if (fp)
+        fclose(fp);
+    stop_capturing();
+    uninit_device();
+    close_device();
+    return 0;
 }
