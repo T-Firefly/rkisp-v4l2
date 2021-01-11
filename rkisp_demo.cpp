@@ -716,7 +716,7 @@ static unsigned long get_time(void)
 
 static void mainloop(void)
 {
-        unsigned int count = 10000;
+        unsigned int count = 1;
         float exptime, expgain;
         int64_t frame_id, frame_sof;
         pthread_t display_thread_id;
@@ -733,8 +733,8 @@ static void mainloop(void)
         while (1) {
 
             DBG("No.%d\n", count);        //显示当前帧数目
-            if(count++ == 10000)
-                count = 0;
+            if(count++ == frame_count)
+                count = break;
 
 			read_start_time = get_time();
             // examples show how to use 3A interfaces
