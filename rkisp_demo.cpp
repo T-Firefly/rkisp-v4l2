@@ -734,7 +734,7 @@ static void mainloop(void)
 
             DBG("No.%d\n", count);        //显示当前帧数目
             if(count++ == frame_count)
-                count = break;
+                break;
 
 			read_start_time = get_time();
             // examples show how to use 3A interfaces
