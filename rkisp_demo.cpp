@@ -509,7 +509,7 @@ static void errno_exit(const char *s)
         exit(EXIT_FAILURE);
 }
 
-#if 0
+#ifdef SET_RKISP_3A
 static int init_drm()
 {
     int drm_fd = drmOpen("rockchip", NULL);
@@ -721,7 +721,7 @@ static void mainloop(void)
         int64_t frame_id, frame_sof;
         pthread_t display_thread_id;
 
-#if 0
+#ifdef SET_RKISP_3A
         if (mae_gain > 0 && mae_expo > 0)
             rkisp_setManualGainAndTime((void*&)g_3A_control_params, mae_gain, mae_expo);
         else
@@ -738,7 +738,7 @@ static void mainloop(void)
 
 			read_start_time = get_time();
             // examples show how to use 3A interfaces
-#if 0
+#ifdef SET_RKISP_3A
             rkisp_getAeTime((void*&)g_3A_control_params, exptime);
             rkisp_getAeGain((void*&)g_3A_control_params, expgain);
             rkisp_getAeMaxExposureGain((void*&)g_3A_control_params, expgain);
@@ -810,7 +810,7 @@ static void start_capturing(void)
         struct RKisp_media_ctl rkisp;
         enum v4l2_buf_type type;
 
-#if 0
+#ifdef SET_RKISP_3A
     	if (_RKIspFunc.init_func != NULL) {
 			_RKIspFunc.init_func(&_rkisp_engine, iq_file,
                                (cl_result_callback_ops_t*)(g_3A_control_params));
@@ -928,7 +928,7 @@ static void uninit_device(void)
         }
 
         dlclose(_RKIspFunc.rkisp_handle);
-#if 0
+#ifdef SET_RKISP_3A
         if (drm_fd != -1)
             deinit_drm(drm_fd);
 #endif
